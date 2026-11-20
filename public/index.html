@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AllenVault — Financial Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- ApexCharts CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              500: '#0284c7',
+              600: '#0369a1',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .glass-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(51, 65, 85, 0.6);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans selection:bg-sky-500/30 selection:text-sky-200">
+
+  <!-- Background decorative glows -->
+  <div class="fixed top-0 left-1/4 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+  <div class="fixed bottom-0 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 relative z-10">
+
+    <!-- ─── HEADER BAR ─────────────────────────────────────────── -->
+    <header class="glass-card rounded-2xl p-5 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+          <i data-lucide="shield-check" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold tracking-tight text-white">AllenVault</h1>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 font-semibold border border-sky-500/30">Dashboard</span>
+          </div>
+          <p class="text-xs text-slate-400">Know Where Your Money Goes — Live Google Sheets Sync</p>
+        </div>
+      </div>
+
+      <!-- Controls: Period Selector & Refresh -->
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="inline-flex p-1 bg-slate-900 rounded-xl border border-slate-800 text-xs font-medium" id="period-selector">
+          <button data-period="today" class="period-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Hari Ini</button>
+          <button data-period="week" class="period-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Minggu Ini</button>
+          <button data-period="month" class="period-btn px-3 py-1.5 rounded-lg bg-sky-600 text-white font-semibold shadow">Bulan Ini</button>
+          <button data-period="year" class="period-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Tahun Ini</button>
+          <button data-period="all" class="period-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Semua</button>
+        </div>
+
+        <button id="btn-refresh" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition">
+          <i data-lucide="refresh-cw" id="refresh-icon" class="w-3.5 h-3.5"></i>
+          <span>Refresh</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Status Notification Bar -->
+    <div id="status-bar" class="flex items-center justify-between text-xs text-slate-400 px-2">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span id="sheet-status">Sinkronisasi Google Sheets Aktif</span>
+      </div>
+      <div id="last-updated">Memuat data...</div>
+    </div>
+
+    <!-- ─── KPI METRICS ROW ─────────────────────────────────────── -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- 1. Total Saldo -->
+      <div class="glass-card rounded-2xl p-5 shadow-lg relative overflow-hidden">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-medium uppercase tracking-wider">Total Saldo Kas & Bank</span>
+          <div class="p-2 rounded-lg bg-sky-500/10 text-sky-400"><i data-lucide="wallet" class="w-4 h-4"></i></div>
+        </div>
+        <div id="metric-total-balance" class="text-2xl font-extrabold text-white">Rp 0</div>
+        <div class="text-xs text-slate-400 mt-2 flex items-center gap-1">
+          <i data-lucide="layers" class="w-3 h-3 text-sky-400"></i>
+          <span id="metric-accounts-count">0 Akun Aktif</span>
+        </div>
+      </div>
+
+      <!-- 2. Total Pemasukan -->
+      <div class="glass-card rounded-2xl p-5 shadow-lg relative overflow-hidden">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-medium uppercase tracking-wider">Total Pemasukan</span>
+          <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400"><i data-lucide="arrow-down-left" class="w-4 h-4"></i></div>
+        </div>
+        <div id="metric-total-income" class="text-2xl font-extrabold text-emerald-400">Rp 0</div>
+        <div class="text-xs text-slate-400 mt-2 flex items-center gap-1">
+          <span id="income-period-label">Bulan Ini</span>
+        </div>
+      </div>
+
+      <!-- 3. Total Pengeluaran -->
+      <div class="glass-card rounded-2xl p-5 shadow-lg relative overflow-hidden">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-medium uppercase tracking-wider">Total Pengeluaran</span>
+          <div class="p-2 rounded-lg bg-rose-500/10 text-rose-400"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></div>
+        </div>
+        <div id="metric-total-expense" class="text-2xl font-extrabold text-rose-400">Rp 0</div>
+        <div class="text-xs text-slate-400 mt-2 flex items-center gap-1">
+          <span id="expense-period-label">Bulan Ini</span>
+        </div>
+      </div>
+
+      <!-- 4. Net Cash Flow -->
+      <div class="glass-card rounded-2xl p-5 shadow-lg relative overflow-hidden">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-medium uppercase tracking-wider">Net Cash Flow</span>
+          <div class="p-2 rounded-lg bg-indigo-500/10 text-indigo-400"><i data-lucide="scale" class="w-4 h-4"></i></div>
+        </div>
+        <div id="metric-net-cashflow" class="text-2xl font-extrabold text-white">Rp 0</div>
+        <div class="mt-2">
+          <span id="net-cashflow-badge" class="text-xs px-2 py-0.5 rounded-md font-semibold bg-emerald-500/20 text-emerald-300">Surplus</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── CHARTS ROW ─────────────────────────────────────────── -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Donut Chart: Pengeluaran per Kategori -->
+      <div class="glass-card rounded-2xl p-5 shadow-lg lg:col-span-5 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-sm font-bold text-white tracking-wide">Pengeluaran per Kategori</h2>
+              <p class="text-xs text-slate-400">Proporsi penggunaan anggaran</p>
+            </div>
+            <i data-lucide="pie-chart" class="w-4 h-4 text-slate-400"></i>
+          </div>
+          <div id="chart-categories" class="min-h-[280px] flex items-center justify-center">
+            <span class="text-xs text-slate-500">Memuat grafik...</span>
+          </div>
+        </div>
+        <div id="categories-summary-list" class="space-y-1.5 mt-3 pt-3 border-t border-slate-800 text-xs">
+          <!-- Item list dynamically injected -->
+        </div>
+      </div>
+
+      <!-- Bar Chart: Pemasukan vs Pengeluaran Bulanan -->
+      <div class="glass-card rounded-2xl p-5 shadow-lg lg:col-span-7 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-sm font-bold text-white tracking-wide">Tren Pemasukan vs Pengeluaran</h2>
+              <p class="text-xs text-slate-400">Histori 6 bulan terakhir</p>
+            </div>
+            <i data-lucide="trending-up" class="w-4 h-4 text-slate-400"></i>
+          </div>
+          <div id="chart-trend" class="min-h-[320px]">
+            <span class="text-xs text-slate-500">Memuat tren...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── BUDGETS & ACCOUNTS ROW ─────────────────────────────── -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Left: Budget Progress Tracker -->
+      <div class="glass-card rounded-2xl p-5 shadow-lg lg:col-span-7">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-sm font-bold text-white tracking-wide">Pemantauan Anggaran (Budget Tracker)</h2>
+            <p class="text-xs text-slate-400">Batas pengeluaran per kategori bulan ini</p>
+          </div>
+          <div class="p-1.5 rounded-lg bg-sky-500/10 text-sky-400"><i data-lucide="target" class="w-4 h-4"></i></div>
+        </div>
+
+        <div id="budget-items-container" class="space-y-4">
+          <div class="text-xs text-slate-500 text-center py-6">Memuat data anggaran...</div>
+        </div>
+      </div>
+
+      <!-- Right: Saldo per Akun -->
+      <div class="glass-card rounded-2xl p-5 shadow-lg lg:col-span-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-sm font-bold text-white tracking-wide">Daftar Akun & Saldo</h2>
+            <p class="text-xs text-slate-400">Rekening bank, e-wallet, dan kas tunai</p>
+          </div>
+          <div class="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400"><i data-lucide="credit-card" class="w-4 h-4"></i></div>
+        </div>
+
+        <div id="accounts-container" class="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
+          <div class="text-xs text-slate-500 text-center py-6">Memuat akun...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── RECENT TRANSACTIONS TABLE ───────────────────────────── -->
+    <div class="glass-card rounded-2xl p-5 shadow-lg">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+        <div>
+          <h2 class="text-sm font-bold text-white tracking-wide">Riwayat Transaksi</h2>
+          <p class="text-xs text-slate-400">Daftar transaksi yang tercatat di Google Sheets</p>
+        </div>
+
+        <!-- Search & Filter Controls -->
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="relative">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input type="text" id="tx-search" placeholder="Cari transaksi..." class="bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 transition w-44 sm:w-56">
+          </div>
+
+          <select id="tx-type-filter" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500 transition">
+            <option value="">Semua Tipe</option>
+            <option value="Expense">Pengeluaran</option>
+            <option value="Income">Pemasukan</option>
+            <option value="Transfer">Transfer</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Table Wrapper -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="text-slate-400 uppercase tracking-wider border-b border-slate-800 font-semibold">
+            <tr>
+              <th class="py-3 px-3">Tanggal</th>
+              <th class="py-3 px-3">Deskripsi / Toko</th>
+              <th class="py-3 px-3">Kategori</th>
+              <th class="py-3 px-3">Akun</th>
+              <th class="py-3 px-3">Tipe</th>
+              <th class="py-3 px-3 text-right">Nominal</th>
+            </tr>
+          </thead>
+          <tbody id="tx-table-body" class="divide-y divide-slate-800/60 font-medium">
+            <tr>
+              <td colspan="6" class="text-center py-8 text-slate-500">Memuat transaksi...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ─── FOOTER ─────────────────────────────────────────────── -->
+    <footer class="text-center text-xs text-slate-500 pt-2 pb-6">
+      AllenVault Personal Finance Assistant &copy; 2026. Data realtime tersinkronisasi dengan Google Sheets.
+    </footer>
+
+  </div>
+
+  <!-- ─── SCRIPT LOGIC ─────────────────────────────────────────── -->
+  <script>
+    let currentPeriod = "month";
+    let categoryChart = null;
+    let trendChart = null;
+
+    // Helper Parse & Format Rupiah
+    function parseAmount(amount) {
+      if (typeof amount === 'number') return amount;
+      if (!amount) return 0;
+      let s = String(amount).trim();
+      if (s.endsWith(',00') || s.endsWith('.00')) s = s.slice(0, -3);
+      const cleaned = s.replace(/[^\d-]/g, '');
+      return parseFloat(cleaned) || 0;
+    }
+
+    function formatIDR(amount) {
+      const val = parseAmount(amount);
+      return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        maximumFractionDigits: 0
+      }).format(val);
+    }
+
+    // Fetch and populate overview
+    async function loadDashboardData(forceRefresh = false) {
+      const btnRefresh = document.getElementById('btn-refresh');
+      const icon = document.getElementById('refresh-icon');
+      if (icon) icon.classList.add('animate-spin');
+
+      try {
+        let url = `/api/overview?period=${currentPeriod}`;
+        if (forceRefresh) url += `&refresh=true`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Gagal mengambil data dari server");
+        const data = await res.json();
+
+        // 1. KPI Cards
+        const sum = data.summary || {};
+        const accs = data.accounts || {};
+        
+        document.getElementById('metric-total-balance').textContent = formatIDR(accs.total_balance || 0);
+        document.getElementById('metric-accounts-count').textContent = `${(accs.accounts || []).length} Akun Aktif`;
+        
+        document.getElementById('metric-total-income').textContent = formatIDR(sum.total_income || 0);
+        document.getElementById('metric-total-expense').textContent = formatIDR(sum.total_expense || 0);
+        
+        const net = sum.net_cashflow || 0;
+        const netSign = net >= 0 ? "+" : "";
+        document.getElementById('metric-net-cashflow').textContent = `${netSign}${formatIDR(net)}`;
+        
+        const netBadge = document.getElementById('net-cashflow-badge');
+        if (net >= 0) {
+          netBadge.textContent = "🟢 Surplus";
+          netBadge.className = "text-xs px-2 py-0.5 rounded-md font-semibold bg-emerald-500/20 text-emerald-300";
+        } else {
+          netBadge.textContent = "🔴 Defisit";
+          netBadge.className = "text-xs px-2 py-0.5 rounded-md font-semibold bg-rose-500/20 text-rose-300";
+        }
+
+        const periodLabel = sum.period_label || "Bulan Ini";
+        document.getElementById('income-period-label').textContent = periodLabel;
+        document.getElementById('expense-period-label').textContent = periodLabel;
+
+        // 2. Charts
+        renderCategoryDonut(sum.category_breakdown || []);
+        renderTrendBar(data.trend || []);
+
+        // 3. Budgets
+        renderBudgets(data.budgets || {});
+
+        // 4. Accounts List
+        renderAccountsList(accs.accounts || []);
+
+        // 5. Update Timestamp
+        document.getElementById('last-updated').textContent = `Terakhir diperbarui: ${new Date().toLocaleTimeString('id-ID')}`;
+
+      } catch (err) {
+        console.error("Dashboard error:", err);
+        document.getElementById('sheet-status').textContent = "⚠️ Error memuat data. Periksa backend.";
+      } finally {
+        if (icon) icon.classList.remove('animate-spin');
+      }
+    }
+
+    // Render Donut Chart
+    function renderCategoryDonut(categories) {
+      const container = document.querySelector("#chart-categories");
+      const listContainer = document.querySelector("#categories-summary-list");
+      listContainer.innerHTML = "";
+
+      if (!categories || categories.length === 0) {
+        container.innerHTML = `<span class="text-xs text-slate-500 py-12">Belum ada data pengeluaran di periode ini.</span>`;
+        if (categoryChart) { categoryChart.destroy(); categoryChart = null; }
+        return;
+      }
+
+      container.innerHTML = "";
+      const labels = categories.slice(0, 6).map(c => c.category);
+      const series = categories.slice(0, 6).map(c => c.amount);
+
+      // Injek summary items di bawah chart
+      categories.slice(0, 4).forEach(item => {
+        const div = document.createElement("div");
+        div.className = "flex items-center justify-between text-slate-300";
+        div.innerHTML = `
+          <span>${item.category}</span>
+          <span class="font-semibold">${formatIDR(item.amount)} <span class="text-slate-500 text-[10px]">(${item.percentage}%)</span></span>
+        `;
+        listContainer.appendChild(div);
+      });
+
+      const options = {
+        chart: { type: 'donut', height: 280, background: 'transparent' },
+        series: series,
+        labels: labels,
+        colors: ['#0284c7', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#64748b'],
+        stroke: { show: false },
+        dataLabels: { enabled: false },
+        legend: { position: 'bottom', labels: { colors: '#94a3b8' } },
+        tooltip: {
+          theme: 'dark',
+          y: { formatter: (val) => formatIDR(val) }
+        },
+        plotOptions: {
+          pie: {
+            donut: {
+              size: '72%',
+              labels: {
+                show: true,
+                total: {
+                  show: true,
+                  label: 'Total',
+                  color: '#94a3b8',
+                  formatter: () => formatIDR(series.reduce((a, b) => a + b, 0))
+                }
+              }
+            }
+          }
+        }
+      };
+
+      if (categoryChart) categoryChart.destroy();
+      categoryChart = new ApexCharts(container, options);
+      categoryChart.render();
+    }
+
+    // Render Trend Bar Chart
+    function renderTrendBar(trendData) {
+      const container = document.querySelector("#chart-trend");
+      if (!trendData || trendData.length === 0) {
+        container.innerHTML = `<span class="text-xs text-slate-500 py-12">Belum cukup data tren bulanan.</span>`;
+        if (trendChart) { trendChart.destroy(); trendChart = null; }
+        return;
+      }
+
+      container.innerHTML = "";
+      const months = trendData.map(t => t.month);
+      const incomes = trendData.map(t => t.income);
+      const expenses = trendData.map(t => t.expense);
+
+      const options = {
+        chart: { type: 'bar', height: 320, background: 'transparent', toolbar: { show: false } },
+        series: [
+          { name: 'Pemasukan', data: incomes },
+          { name: 'Pengeluaran', data: expenses }
+        ],
+        colors: ['#10b981', '#f43f5e'],
+        plotOptions: {
+          bar: { borderRadius: 6, columnWidth: '45%' }
+        },
+        dataLabels: { enabled: false },
+        stroke: { show: true, width: 2, colors: ['transparent'] },
+        xaxis: {
+          categories: months,
+          labels: { style: { colors: '#94a3b8', fontSize: '11px' } },
+          axisBorder: { show: false }
+        },
+        yaxis: {
+          labels: {
+            style: { colors: '#94a3b8', fontSize: '11px' },
+            formatter: (val) => (val >= 1000000 ? (val/1000000).toFixed(1) + 'jt' : (val/1000).toFixed(0) + 'k')
+          }
+        },
+        grid: { borderColor: '#1e293b', strokeDashArray: 3 },
+        legend: { position: 'top', labels: { colors: '#94a3b8' } },
+        tooltip: {
+          theme: 'dark',
+          y: { formatter: (val) => formatIDR(val) }
+        }
+      };
+
+      if (trendChart) trendChart.destroy();
+      trendChart = new ApexCharts(container, options);
+      trendChart.render();
+    }
+
+    // Render Budget Tracker
+    function renderBudgets(budgetData) {
+      const container = document.getElementById('budget-items-container');
+      const items = budgetData.items || [];
+
+      if (items.length === 0) {
+        container.innerHTML = `
+          <div class="text-xs text-slate-500 py-6 text-center">
+            Belum ada anggaran diatur di tab Budgets.<br>
+            <span class="text-slate-400">Gunakan Telegram bot <code>/budget set &lt;kategori&gt; &lt;nominal&gt;</code></span>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = items.map(b => {
+        const pct = Math.min(b.percentage, 100);
+        let barColor = "bg-emerald-500";
+        let statusBadge = `<span class="text-[10px] px-2 py-0.5 rounded font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Aman</span>`;
+
+        if (b.status === "exceeded") {
+          barColor = "bg-rose-500";
+          statusBadge = `<span class="text-[10px] px-2 py-0.5 rounded font-semibold bg-rose-500/20 text-rose-400 border border-rose-500/30">Over Budget</span>`;
+        } else if (b.status === "warning") {
+          barColor = "bg-amber-500";
+          statusBadge = `<span class="text-[10px] px-2 py-0.5 rounded font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">Waspada</span>`;
+        }
+
+        return `
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-200">${b.category}</span>
+                ${statusBadge}
+              </div>
+              <span class="text-slate-400 font-semibold">${formatIDR(b.spent)} <span class="text-slate-600">/</span> ${formatIDR(b.budget)} <span class="text-slate-400">(${b.percentage}%)</span></span>
+            </div>
+            <div class="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+              <div class="h-full ${barColor} rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Render Accounts List
+    function renderAccountsList(accounts) {
+      const container = document.getElementById('accounts-container');
+      if (!accounts || accounts.length === 0) {
+        container.innerHTML = `<div class="text-xs text-slate-500 text-center py-6">Tidak ada akun terdaftar.</div>`;
+        return;
+      }
+
+      container.innerHTML = accounts.map(a => {
+        return `
+          <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-sky-500/10 flex items-center justify-center text-sky-400">
+                <i data-lucide="credit-card" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-white">${a.account_name}</div>
+                <div class="text-[10px] text-slate-400">${a.account_type || 'Bank / E-Wallet'}</div>
+              </div>
+            </div>
+            <div class="text-xs font-extrabold text-white">${formatIDR(a.balance !== undefined ? a.balance : (a.current_balance || 0))}</div>
+          </div>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    // Load Transactions Table
+    async function loadTransactions(forceRefresh = false) {
+      const search = document.getElementById('tx-search').value;
+      const txType = document.getElementById('tx-type-filter').value;
+      const tbody = document.getElementById('tx-table-body');
+
+      try {
+        let url = `/api/transactions?limit=100`;
+        if (forceRefresh) url += `&refresh=true`;
+        if (txType) url += `&tx_type=${encodeURIComponent(txType)}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+        const txs = data.transactions || [];
+
+        if (txs.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-500">Tidak ada transaksi yang cocok.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = txs.map(t => {
+          const isExpense = t.type === 'Expense';
+          const isIncome = t.type === 'Income';
+          const amountColor = isExpense ? 'text-rose-400' : (isIncome ? 'text-emerald-400' : 'text-sky-400');
+          const prefix = isExpense ? '-' : (isIncome ? '+' : '');
+
+          let typePill = `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300">Transfer</span>`;
+          if (isExpense) typePill = `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/20">Expense</span>`;
+          if (isIncome) typePill = `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">Income</span>`;
+
+          const desc = t.description || t.merchant || '-';
+          const cat = t.category || '-';
+          const acc = t.account || (t.from_account ? `${t.from_account} ➔ ${t.to_account}` : '-');
+
+          return `
+            <tr class="hover:bg-slate-900/40 transition">
+              <td class="py-3 px-3 text-slate-400 whitespace-nowrap">${t.date || '-'}</td>
+              <td class="py-3 px-3 font-semibold text-slate-200">${desc}</td>
+              <td class="py-3 px-3 text-slate-300 whitespace-nowrap"><span class="px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-700/60">${cat}</span></td>
+              <td class="py-3 px-3 text-slate-300 whitespace-nowrap">${acc}</td>
+              <td class="py-3 px-3 whitespace-nowrap">${typePill}</td>
+              <td class="py-3 px-3 text-right font-bold ${amountColor} whitespace-nowrap">${prefix}${formatIDR(t.amount)}</td>
+            </tr>
+          `;
+        }).join('');
+
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-rose-500">Gagal memuat transaksi.</td></tr>`;
+      }
+    }
+
+    // Event Listeners
+    document.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      loadDashboardData();
+      loadTransactions();
+
+      // Period selector buttons
+      document.querySelectorAll(".period-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".period-btn").forEach(b => {
+            b.className = "period-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition";
+          });
+          btn.className = "period-btn px-3 py-1.5 rounded-lg bg-sky-600 text-white font-semibold shadow";
+          currentPeriod = btn.dataset.period;
+          loadDashboardData();
+        });
+      });
+
+      // Refresh button (force refresh dari Google Sheets)
+      document.getElementById('btn-refresh').addEventListener('click', () => {
+        loadDashboardData(true);
+        loadTransactions(true);
+      });
+
+      // Search & filter
+      let searchTimeout = null;
+      document.getElementById('tx-search').addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(loadTransactions, 350);
+      });
+
+      document.getElementById('tx-type-filter').addEventListener('change', loadTransactions);
+    });
+  </script>
+</body>
+</html>
+
